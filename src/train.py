@@ -38,9 +38,9 @@ dataloader = torch.utils.data.DataLoader(dataset,
 # 选择设备
 device = torch.device("cuda: 0" if (torch.cuda.is_available() and param.ngpu > 0) else "cpu")
 
-netG = model.Generator(param.ngpu).to(device)
+netG = model.Generator().to(device)
 # netG.apply(weights_init)
-netD = model.Discriminator(param.ngpu).to(device)
+netD = model.Discriminator().to(device)
 # netD.apply(weights_init)
 
 criterion = nn.BCELoss()
@@ -51,6 +51,8 @@ fake_label = 0
 
 optimizerG = optim.Adam(netG.parameters(), lr=param.lr, betas=(param.beta1, 0.999))
 optimizerD = optim.Adam(netD.parameters(), lr=param.lr, betas=(param.beta1, 0.999))
+
+gan_type = "standard"
 
 
 # Train Loop
@@ -68,37 +70,46 @@ def train():
 			##############################
 			# 更新鉴别器
 			##############################
+			for critic_iter in range(param.n_critic):
+				# real batch
+				netD.zero_grad()
+				real = data[0].to(device)
+				batch_size = real.size(0)
+				pred_real_label = torch.full((batch_size,), real_label, device=device)
+				pred_real = netD(real).view(-1)
+				D_x = pred_real.mean().item()
 
-			# real batch
-			netD.zero_grad()
-			real = data[0].to(device)
-			batch_size = real.size(0)
-			pred_real_label = torch.full((batch_size,), real_label, device=device)
-			pred_real = netD(real).view(-1)
-			D_x = pred_real.mean().item()
-
-			# fake batch
-			noise = torch.randn(batch_size, param.nz, 1, 1, device=device)
-			fake = netG(noise)
-			pred_fake_label = torch.full((batch_size,), fake_label, device=device)
-			pred_fake = netD(fake.detach()).view(-1)
-			D_G_z1 = pred_fake.mean().item()
-			errD = (BCE_stable(pred_real - torch.mean(pred_fake), pred_real_label)
-					 + BCE_stable(pred_fake - torch.mean(pred_real), pred_fake_label))/2
-			errD.backward()
-			optimizerD.step()
+				# fake batch
+				noise = torch.randn(batch_size, param.nz, 1, 1, device=device)
+				fake = netG(noise)
+				pred_fake_label = torch.full((batch_size,), fake_label, device=device)
+				pred_fake = netD(fake.detach()).view(-1)
+				D_G_z1 = pred_fake.mean().item()
+				if gan_type == 'ragan':
+					errD = (BCE_stable(pred_real - torch.mean(pred_fake), pred_real_label)
+							 + BCE_stable(pred_fake - torch.mean(pred_real), pred_fake_label))/2
+					errD.backward()
+				elif gan_type == 'standard':
+					errD_real = criterion(nn.Sigmoid()(pred_real), pred_real_label)
+					errD_fake = criterion(nn.Sigmoid()(pred_fake), pred_fake_label)
+					errD = errD_real + errD_fake
+					errD.backward()
+				optimizerD.step()
 
 			##############################
 			# 更新生成器
 			##############################
-			if iters % param.n_critic == 0:
-				netG.zero_grad()
-				pred_fake = netD(fake).view(-1)
+			netG.zero_grad()
+			pred_fake = netD(fake).view(-1)
+			if gan_type == 'ragan':
 				errG = (BCE_stable(pred_real.detach() - torch.mean(pred_fake), pred_fake_label) +
 						BCE_stable(pred_fake - torch.mean(pred_real.detach()), pred_real_label))/2
 				errG.backward()
-				D_G_z2 = pred_fake.mean().item()
-				optimizerG.step()
+			elif gan_type == 'standard':
+				errG = criterion(nn.Sigmoid()(pred_fake), pred_real_label)
+				errG.backward()
+			D_G_z2 = pred_fake.mean().item()
+			optimizerG.step()
 
 
 			if i % 50 == 0:
