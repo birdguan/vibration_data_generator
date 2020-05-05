@@ -64,27 +64,27 @@ class Discriminator(nn.Module):
 
 			# (128, 128, ndf) -> (64, 64, ndf)
 			nn.Conv2d(ndf, ndf, 4, 2, 1, bias=False),
-			nn.BatchNorm2d(ndf),
+			nn.InstanceNorm2d(ndf, affine=True),
 			nn.LeakyReLU(0.2, inplace=True),
 
 			# (64, 64, ndf) -> (32, 32, ndf*2)
 			nn.Conv2d(ndf, ndf*2, 4, 2, 1, bias=False),
-			nn.BatchNorm2d(ndf*2),
+			nn.InstanceNorm2d(ndf*2, affine=True),
 			nn.LeakyReLU(0.2, inplace=True),
 
 			# (32, 32, ndf*2) -> (16, 16, ndf*2)
 			nn.Conv2d(ndf*2, ndf*2, 4, 2, 1, bias=False),
-			nn.BatchNorm2d(ndf*2),
+			nn.InstanceNorm2d(ndf*2, affine=True),
 			nn.LeakyReLU(0.2, inplace=True),
 
 			# (16, 16, ndf*2) -> (8, 8, ndf*4)
 			nn.Conv2d(ndf*2, ndf*4, 4, 2, 1, bias=False),
-			nn.BatchNorm2d(ndf * 4),
+			nn.InstanceNorm2d(ndf * 4, affline=True),
 			nn.LeakyReLU(0.2, inplace=True),
 
 			# (8, 8, ndf*4) -> (4, 4, ndf*8)
 			nn.Conv2d(ndf*4, ndf*8, 4, 2, 1, bias=False),
-			nn.BatchNorm2d(ndf*8),
+			nn.InstanceNorm2d(ndf*8, affline=True),
 			nn.LeakyReLU(0.2, inplace=True),
 		)
 		self.output = nn.Sequential(
