@@ -1,13 +1,20 @@
 import torch
 from src.parameters import *
 import torch.nn as nn
-
+import torch.optim as optim
+import torch.utils.data
+import torchvision.datasets as datasets
+import torchvision.transforms as transforms
+from torch.autograd import Variable
+from torch import autograd
+import torchvision.utils as vutils
+import matplotlib.pyplot as plt
+import numpy as np
 
 class Generator(nn.Module):
-    def __init__(self, ngpu):
-        super(Generator, self).__init__()
-        self.ngpu = ngpu
-        self.model = nn.Sequential(
+	def __init__(self):
+		super(Generator, self).__init__()
+		self.main_module = nn.Sequential(
             # 噪声 -> (4, 4, ngf*8)
             nn.ConvTranspose2d(nz, ngf*8, 4, 1, 0, bias=False),
             nn.BatchNorm2d(ngf * 8),
@@ -43,16 +50,14 @@ class Generator(nn.Module):
             nn.Tanh()
         )
 
-    def forward(self, input):
-        return self.model(input)
-
+	def forward(self, x):
+		return self.main_module(x)
 
 
 class Discriminator(nn.Module):
-    def __init__(self, ngpu):
-        super(Discriminator, self).__init__()
-        self.ngpu = ngpu
-        self.model = nn.Sequential(
+	def __init__(self):
+		super(Discriminator, self).__init__()
+		self.main_module = nn.Sequential(
             # (256, 256, nc) -> (128, 128, ndf)
             nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
@@ -81,11 +86,140 @@ class Discriminator(nn.Module):
             nn.Conv2d(ndf*4, ndf*8, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ndf*8),
             nn.LeakyReLU(0.2, inplace=True),
-
-            # out
-            nn.Conv2d(ndf*8, 1, 4, 1, 0, bias=False),
-            nn.Sigmoid()
         )
+		self.output = nn.Sequential(
+			nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
+		)
 
-    def forward(self, input):
-        return self.model(input)
+	def forward(self, x):
+		x = self.main_module(x)
+		return self.output(x)
+
+	def feature_extraction(self, x):
+		x = self.main_module(x)
+		return x.view(-1, ndf*8*4*4)
+
+
+class WGAN_GP():
+	def __init__(self):
+		self.G = Generator()
+		self.D = Discriminator()
+		self.device = torch.device("cuda: 0" if (torch.cuda.is_available() and ngpu > 0) else "cpu")
+
+		self.learing_rate = lr
+		self.b1 = beta1
+		self.b2 = 0.999
+		self.batch_size = batch_size
+		self.lambda_term = 10
+		self.criterion = nn.BCELoss()
+		self.BCE_stable = nn.BCEWithLogitsLoss()
+		self.fixed_noise = torch.rand(16, nz, 1, 1, device=self.device)
+		self.real_label = 1
+		self.fake_label = 0
+
+		self.d_optimizer = optim.Adam(self.D.parameters(), lr = self.learing_rate, betas=(self.b1, self.b2))
+		self.g_optimizer = optim.Adam(self.G.parameters(), lr = self.learing_rate, betas=(self.b1, self.b2))
+
+		self.batch_size = batch_size
+		self.critic_iter = n_critic
+
+
+	def calculate_gradient_penalty(self, real, fake):
+		eta = torch.FloatTensor(self.batch_size, 1, 1, 1).uniform_(0, 1)
+		eta = eta.expand(self.batch_size, real.size(1), real.size(2), real.size(3))
+		eta = eta.to(self.device)
+		interpolated = eta * real + ((1 - eta) * fake).to(self.device)
+		interpolated = Variable(interpolated, requires_grad=True)
+		prob_interpolated = self.D(interpolated)
+		gradients = autograd.grad(outputs=prob_interpolated, inputs=interpolated,
+							 grad_outputs=torch.ones(prob_interpolated.size()).to(self.device),
+								  create_graph=True,
+								  retain_graph=True)[0]
+		grad_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * self.lambda_term
+		return grad_penalty
+
+
+	def save(self, epoch):
+		torch.save(self.G.state_dict(), "./generator_" + str(epoch) + ".pkl")
+		torch.save(self.D.state_dict(), "./discriminator_" + str(epoch) + ".pkl")
+
+	def load_model(self, epoch):
+		self.D.load_state_dict(torch.load("./generator_" + str(epoch) + ".pkl"))
+		self.G.load_state_dict(torch.load("./discriminator_" + str(epoch) + ".pkl"))
+
+	def train(self):
+		# 创建dataset
+		dataset = datasets.ImageFolder(root=dataroot,
+									   transform=transforms.Compose([
+										   transforms.Resize(image_size),
+										   transforms.CenterCrop(image_size),
+										   transforms.ToTensor(),
+										   # transforms.Normalize((0.5,), (0.5,)),
+									   ]))
+		# 创建dataloader
+		dataloader = torch.utils.data.DataLoader(dataset,
+												 batch_size=self.batch_size,
+												 shuffle=True,
+												 num_workers=works)
+		G_losses = []
+		D_losses = []
+		img_list = []
+		fig = plt.figure(figsize=(4, 4))
+		plt.ion()
+		plt.axis("off")
+		iters = 0
+		print(" ==== START TRAINING ==== ")
+		for epoch in range(num_epochs):
+			for i, data in enumerate(dataloader, 0):
+				##############################
+				# 更新鉴别器
+				##############################
+				for d_iter in range(self.critic_iter):
+					# real batch
+					self.D.zero_grad()
+					real = data[0].to(self.device)
+					batch_size = real.size(0)
+					pred_real_label = torch.full((batch_size,), self.real_label, device=device)
+					pred_real = self.D(real).view(-1)
+					D_x = pred_real.mean().item()
+
+					# fake batch
+					noise = torch.randn(batch_size, nz, 1, 1, device=self.device)
+					fake = self.G(noise)
+					pred_fake_label = torch.full((batch_size,), self.fake_label, device=self.device)
+					pred_fake = self.D(fake.detach()).view(-1)
+					D_G_z1 = pred_fake.mean().item()
+					errD = (self.BCE_stable(pred_real - torch.mean(pred_fake), pred_real_label)
+							+ self.BCE_stable(pred_fake - torch.mean(pred_real), pred_fake_label)) / 2
+					errD.backward()
+					self.d_optimizer.step()
+
+				##############################
+				# 更新生成器
+				##############################
+				if iters % n_critic == 0:
+					self.G.zero_grad()
+					pred_fake = self.D(fake).view(-1)
+					errG = (self.BCE_stable(pred_real.detach() - torch.mean(pred_fake), pred_fake_label) +
+							self.BCE_stable(pred_fake - torch.mean(pred_real.detach()), pred_real_label)) / 2
+					errG.backward()
+					D_G_z2 = pred_fake.mean().item()
+					self.g_optimizer.step()
+
+				if i % 50 == 0:
+					print('[%d/%d][%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f'
+						  % (epoch, num_epochs, i, len(dataloader),
+							 errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
+
+				G_losses.append(errG.item())
+				D_losses.append(errD.item())
+				iters += 1
+
+			with torch.no_grad():
+				fake = self.G(self.fixed_noise).detach().cpu()
+			img_list = vutils.make_grid(fake, nrow=4, padding=2, normalize=True)
+			plt.imshow(np.transpose(img_list, (1, 2, 0)))
+			plt.title("epoch:" + str(epoch))
+			plt.pause(1)
+			plt.clf()
+		plt.ioff()
