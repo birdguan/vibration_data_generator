@@ -14,7 +14,7 @@ image_size = 256
 nc = 3
 
 # 噪声向量大小
-nz = 100
+nz = 1000
 
 # 生成器特征图大小
 ngf = 64
@@ -33,3 +33,6 @@ beta1 = 0.5
 
 # GPU数量，0表示使用CPU
 ngpu = 1
+
+#
+n_critic = 5

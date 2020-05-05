@@ -28,7 +28,7 @@ dataset = datasets.ImageFolder(root=param.dataroot,
 								   transforms.Resize(param.image_size),
 								   transforms.CenterCrop(param.image_size),
 								   transforms.ToTensor(),
-								   transforms.Normalize((0.5,), (0.5,)),
+								   # transforms.Normalize((0.5,), (0.5,)),
 							   ]))
 # 创建dataloader
 dataloader = torch.utils.data.DataLoader(dataset,
@@ -44,7 +44,8 @@ netD = model.Discriminator(param.ngpu).to(device)
 # netD.apply(weights_init)
 
 criterion = nn.BCELoss()
-fixed_noise = torch.rand(64, param.nz, 1, 1, device=device)
+BCE_stable = nn.BCEWithLogitsLoss()
+fixed_noise = torch.rand(16, param.nz, 1, 1, device=device)
 real_label = 1
 fake_label = 0
 
@@ -57,7 +58,7 @@ def train():
 	G_losses = []
 	D_losses = []
 	img_list = []
-	fig = plt.figure(figsize=(8, 8))
+	fig = plt.figure(figsize=(4, 4))
 	plt.ion()
 	plt.axis("off")
 	iters = 0
@@ -72,33 +73,32 @@ def train():
 			netD.zero_grad()
 			real = data[0].to(device)
 			batch_size = real.size(0)
-			label = torch.full((batch_size, ), real_label, device=device)
-			output = netD(real).view(-1)
-			errD_real = criterion(output, label)
-			errD_real.backward()
-			D_x = output.mean().item()
+			pred_real_label = torch.full((batch_size,), real_label, device=device)
+			pred_real = netD(real).view(-1)
+			D_x = pred_real.mean().item()
 
 			# fake batch
 			noise = torch.randn(batch_size, param.nz, 1, 1, device=device)
 			fake = netG(noise)
-			label.fill_(fake_label)
-			output = netD(fake.detach()).view(-1)
-			errD_fake = criterion(output, label)
-			errD_fake.backward()
-			D_G_z1 = output.mean().item()
-			errD = errD_real + errD_fake
+			pred_fake_label = torch.full((batch_size,), fake_label, device=device)
+			pred_fake = netD(fake.detach()).view(-1)
+			D_G_z1 = pred_fake.mean().item()
+			errD = (BCE_stable(pred_real - torch.mean(pred_fake), pred_real_label)
+					 + BCE_stable(pred_fake - torch.mean(pred_real), pred_fake_label))/2
+			errD.backward()
 			optimizerD.step()
 
 			##############################
 			# 更新生成器
 			##############################
-			netG.zero_grad()
-			label.fill_(real_label)
-			output = netD(fake).view(-1)
-			errG = criterion(output, label)
-			errG.backward()
-			D_G_z2 = output.mean().item()
-			optimizerG.step()
+			if iters % param.n_critic == 0:
+				netG.zero_grad()
+				pred_fake = netD(fake).view(-1)
+				errG = (BCE_stable(pred_real.detach() - torch.mean(pred_fake), pred_fake_label) +
+						BCE_stable(pred_fake - torch.mean(pred_real.detach()), pred_real_label))/2
+				errG.backward()
+				D_G_z2 = pred_fake.mean().item()
+				optimizerG.step()
 
 
 			if i % 50 == 0:
@@ -108,16 +108,13 @@ def train():
 
 			G_losses.append(errG.item())
 			D_losses.append(errD.item())
-
-			if (iters % 50 == 0) or ((epoch == param.num_epochs - 1) and (i == len(dataloader) - 1)):
-				img_list = []
-				with torch.no_grad():
-					fake = netG(fixed_noise).detach().cpu()
-				img_list = vutils.make_grid(fake, padding=2, normalize=True)
-
 			iters += 1
 
+		with torch.no_grad():
+			fake = netG(fixed_noise).detach().cpu()
+		img_list = vutils.make_grid(fake, nrow=4, padding=2, normalize=True)
 		plt.imshow(np.transpose(img_list, (1, 2, 0)))
+		plt.title("epoch:" + str(epoch))
 		plt.pause(1)
 		plt.clf()
 	plt.ioff()
