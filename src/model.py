@@ -15,40 +15,40 @@ class Generator(nn.Module):
 	def __init__(self):
 		super(Generator, self).__init__()
 		self.main_module = nn.Sequential(
-            # 噪声 -> (4, 4, ngf*8)
-            nn.ConvTranspose2d(nz, ngf*8, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(ngf * 8),
-            nn.ReLU(True),
+			# 噪声 -> (4, 4, ngf*8)
+			nn.ConvTranspose2d(nz, ngf*8, 4, 1, 0, bias=False),
+			nn.BatchNorm2d(ngf * 8),
+			nn.ReLU(True),
 
-            # (4, 4, ngf*8) -> (8, 8, ngf*4)
-            nn.ConvTranspose2d(ngf*8, ngf*4, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf*4),
-            nn.ReLU(True),
+			# (4, 4, ngf*8) -> (8, 8, ngf*4)
+			nn.ConvTranspose2d(ngf*8, ngf*4, 4, 2, 1, bias=False),
+			nn.BatchNorm2d(ngf*4),
+			nn.ReLU(True),
 
-            # (8, 8, ngf*4) -> (16, 16, ngf*2)
-            nn.ConvTranspose2d(ngf*4, ngf*2, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf*2),
-            nn.ReLU(True),
+			# (8, 8, ngf*4) -> (16, 16, ngf*2)
+			nn.ConvTranspose2d(ngf*4, ngf*2, 4, 2, 1, bias=False),
+			nn.BatchNorm2d(ngf*2),
+			nn.ReLU(True),
 
-            # (16, 16, ngf*2) -> (32, 32, ngf*2)
-            nn.ConvTranspose2d(ngf * 2, ngf * 2, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 2),
-            nn.ReLU(True),
+			# (16, 16, ngf*2) -> (32, 32, ngf*2)
+			nn.ConvTranspose2d(ngf * 2, ngf * 2, 4, 2, 1, bias=False),
+			nn.BatchNorm2d(ngf * 2),
+			nn.ReLU(True),
 
-            # (32, 32, ngf*2) -> (64, 64, ngf)
-            nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf),
-            nn.ReLU(True),
+			# (32, 32, ngf*2) -> (64, 64, ngf)
+			nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
+			nn.BatchNorm2d(ngf),
+			nn.ReLU(True),
 
-            # (64, 64, ngf) -> (128, 128, ngf)
-            nn.ConvTranspose2d(ngf, ngf, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf),
-            nn.ReLU(True),
+			# (64, 64, ngf) -> (128, 128, ngf)
+			nn.ConvTranspose2d(ngf, ngf, 4, 2, 1, bias=False),
+			nn.BatchNorm2d(ngf),
+			nn.ReLU(True),
 
-            # (128, 128, ngf) -> (256, 256, nc)
-            nn.ConvTranspose2d(ngf, nc, 4, 2, 1, bias=False),
-            nn.Tanh()
-        )
+			# (128, 128, ngf) -> (256, 256, nc)
+			nn.ConvTranspose2d(ngf, nc, 4, 2, 1, bias=False),
+			nn.Tanh()
+		)
 
 	def forward(self, x):
 		return self.main_module(x)
@@ -58,35 +58,35 @@ class Discriminator(nn.Module):
 	def __init__(self):
 		super(Discriminator, self).__init__()
 		self.main_module = nn.Sequential(
-            # (256, 256, nc) -> (128, 128, ndf)
-            nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
-            nn.LeakyReLU(0.2, inplace=True),
+			# (256, 256, nc) -> (128, 128, ndf)
+			nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
+			nn.LeakyReLU(0.2, inplace=True),
 
-            # (128, 128, ndf) -> (64, 64, ndf)
-            nn.Conv2d(ndf, ndf, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ndf),
-            nn.LeakyReLU(0.2, inplace=True),
+			# (128, 128, ndf) -> (64, 64, ndf)
+			nn.Conv2d(ndf, ndf, 4, 2, 1, bias=False),
+			nn.BatchNorm2d(ndf),
+			nn.LeakyReLU(0.2, inplace=True),
 
-            # (64, 64, ndf) -> (32, 32, ndf*2)
-            nn.Conv2d(ndf, ndf*2, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ndf*2),
-            nn.LeakyReLU(0.2, inplace=True),
+			# (64, 64, ndf) -> (32, 32, ndf*2)
+			nn.Conv2d(ndf, ndf*2, 4, 2, 1, bias=False),
+			nn.BatchNorm2d(ndf*2),
+			nn.LeakyReLU(0.2, inplace=True),
 
-            # (32, 32, ndf*2) -> (16, 16, ndf*2)
-            nn.Conv2d(ndf*2, ndf*2, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ndf*2),
-            nn.LeakyReLU(0.2, inplace=True),
+			# (32, 32, ndf*2) -> (16, 16, ndf*2)
+			nn.Conv2d(ndf*2, ndf*2, 4, 2, 1, bias=False),
+			nn.BatchNorm2d(ndf*2),
+			nn.LeakyReLU(0.2, inplace=True),
 
-            # (16, 16, ndf*2) -> (8, 8, ndf*4)
-            nn.Conv2d(ndf*2, ndf*4, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ndf * 4),
-            nn.LeakyReLU(0.2, inplace=True),
+			# (16, 16, ndf*2) -> (8, 8, ndf*4)
+			nn.Conv2d(ndf*2, ndf*4, 4, 2, 1, bias=False),
+			nn.BatchNorm2d(ndf * 4),
+			nn.LeakyReLU(0.2, inplace=True),
 
-            # (8, 8, ndf*4) -> (4, 4, ndf*8)
-            nn.Conv2d(ndf*4, ndf*8, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ndf*8),
-            nn.LeakyReLU(0.2, inplace=True),
-        )
+			# (8, 8, ndf*4) -> (4, 4, ndf*8)
+			nn.Conv2d(ndf*4, ndf*8, 4, 2, 1, bias=False),
+			nn.BatchNorm2d(ndf*8),
+			nn.LeakyReLU(0.2, inplace=True),
+		)
 		self.output = nn.Sequential(
 			nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
 		)
@@ -102,9 +102,9 @@ class Discriminator(nn.Module):
 
 class WGAN_GP():
 	def __init__(self):
-		self.G = Generator()
-		self.D = Discriminator()
 		self.device = torch.device("cuda: 0" if (torch.cuda.is_available() and ngpu > 0) else "cpu")
+		self.G = Generator().to(self.device)
+		self.D = Discriminator().to(self.device)
 
 		self.learing_rate = lr
 		self.b1 = beta1
@@ -124,9 +124,9 @@ class WGAN_GP():
 		self.critic_iter = n_critic
 
 
-	def calculate_gradient_penalty(self, real, fake):
-		eta = torch.FloatTensor(self.batch_size, 1, 1, 1).uniform_(0, 1)
-		eta = eta.expand(self.batch_size, real.size(1), real.size(2), real.size(3))
+	def calculate_gradient_penalty(self, real, fake, batch_size):
+		eta = torch.FloatTensor(batch_size, 1, 1, 1).uniform_(0, 1)
+		eta = eta.expand(batch_size, real.size(1), real.size(2), real.size(3))
 		eta = eta.to(self.device)
 		interpolated = eta * real + ((1 - eta) * fake).to(self.device)
 		interpolated = Variable(interpolated, requires_grad=True)
@@ -178,20 +178,26 @@ class WGAN_GP():
 					# real batch
 					self.D.zero_grad()
 					real = data[0].to(self.device)
+					errD_real = -1 * self.D(real).mean()
+					errD_real.backward()
+
 					batch_size = real.size(0)
-					pred_real_label = torch.full((batch_size,), self.real_label, device=device)
 					pred_real = self.D(real).view(-1)
 					D_x = pred_real.mean().item()
 
 					# fake batch
 					noise = torch.randn(batch_size, nz, 1, 1, device=self.device)
 					fake = self.G(noise)
-					pred_fake_label = torch.full((batch_size,), self.fake_label, device=self.device)
+					errD_fake = self.D(fake.detach()).mean()
+					errD_fake.backward()
 					pred_fake = self.D(fake.detach()).view(-1)
 					D_G_z1 = pred_fake.mean().item()
-					errD = (self.BCE_stable(pred_real - torch.mean(pred_fake), pred_real_label)
-							+ self.BCE_stable(pred_fake - torch.mean(pred_real), pred_fake_label)) / 2
-					errD.backward()
+
+					# gradient penalty
+					gradient_penalty = self.calculate_gradient_penalty(real, fake, batch_size)
+					gradient_penalty.backward()
+
+					errD = errD_real + errD_fake + gradient_penalty
 					self.d_optimizer.step()
 
 				##############################
@@ -199,17 +205,14 @@ class WGAN_GP():
 				##############################
 				if iters % n_critic == 0:
 					self.G.zero_grad()
-					pred_fake = self.D(fake).view(-1)
-					errG = (self.BCE_stable(pred_real.detach() - torch.mean(pred_fake), pred_fake_label) +
-							self.BCE_stable(pred_fake - torch.mean(pred_real.detach()), pred_real_label)) / 2
+					errG = self.D(fake).mean()
 					errG.backward()
-					D_G_z2 = pred_fake.mean().item()
 					self.g_optimizer.step()
 
 				if i % 50 == 0:
-					print('[%d/%d][%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f'
+					print('[%d/%d][%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f'
 						  % (epoch, num_epochs, i, len(dataloader),
-							 errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
+							 errD.item(), errG.item(), D_x, D_G_z1))
 
 				G_losses.append(errG.item())
 				D_losses.append(errD.item())
@@ -223,3 +226,8 @@ class WGAN_GP():
 			plt.pause(1)
 			plt.clf()
 		plt.ioff()
+
+
+if __name__ == '__main__':
+	model = WGAN_GP()
+	model.train()
