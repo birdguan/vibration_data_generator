@@ -10,6 +10,7 @@ from torch import autograd
 import torchvision.utils as vutils
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 class Generator(nn.Module):
 	def __init__(self):
@@ -79,12 +80,12 @@ class Discriminator(nn.Module):
 
 			# (16, 16, ndf*2) -> (8, 8, ndf*4)
 			nn.Conv2d(ndf*2, ndf*4, 4, 2, 1, bias=False),
-			nn.InstanceNorm2d(ndf * 4, affline=True),
+			nn.InstanceNorm2d(ndf * 4, affine=True),
 			nn.LeakyReLU(0.2, inplace=True),
 
 			# (8, 8, ndf*4) -> (4, 4, ndf*8)
 			nn.Conv2d(ndf*4, ndf*8, 4, 2, 1, bias=False),
-			nn.InstanceNorm2d(ndf*8, affline=True),
+			nn.InstanceNorm2d(ndf*8, affine=True),
 			nn.LeakyReLU(0.2, inplace=True),
 		)
 		self.output = nn.Sequential(
@@ -139,13 +140,13 @@ class WGAN_GP():
 		return grad_penalty
 
 
-	def save(self, epoch):
-		torch.save(self.G.state_dict(), "./generator_" + str(epoch) + ".pkl")
-		torch.save(self.D.state_dict(), "./discriminator_" + str(epoch) + ".pkl")
+	def save_model(self, epoch):
+		torch.save(self.G.state_dict(), "../frozen_model/generator_{}.pkl".format(epoch))
+		torch.save(self.D.state_dict(), "../frozen_model/discriminator_{}.pkl".format(epoch))
 
 	def load_model(self, epoch):
-		self.D.load_state_dict(torch.load("./generator_" + str(epoch) + ".pkl"))
-		self.G.load_state_dict(torch.load("./discriminator_" + str(epoch) + ".pkl"))
+		self.D.load_state_dict(torch.load("../frozen_model/generator_{}.pkl".format(epoch)))
+		self.G.load_state_dict(torch.load("../frozen_model/discriminator_{}.pkl".format(epoch)))
 
 	def train(self):
 		# 创建dataset
@@ -164,10 +165,13 @@ class WGAN_GP():
 		G_losses = []
 		D_losses = []
 		img_list = []
+		fixed_noise = torch.rand(16, nz, 1, 1, device=self.device)
 		fig = plt.figure(figsize=(4, 4))
 		plt.ion()
 		plt.axis("off")
 		iters = 0
+		one = torch.FloatTensor([1]).to(self.device)
+		mone = one * -1
 		print(" ==== START TRAINING ==== ")
 		for epoch in range(num_epochs):
 			for i, data in enumerate(dataloader, 0):
@@ -178,8 +182,8 @@ class WGAN_GP():
 					# real batch
 					self.D.zero_grad()
 					real = data[0].to(self.device)
-					errD_real = -1 * self.D(real).mean()
-					errD_real.backward()
+					errD_real = self.D(real).mean()
+					errD_real.backward(mone)
 
 					batch_size = real.size(0)
 					pred_real = self.D(real).view(-1)
@@ -189,13 +193,14 @@ class WGAN_GP():
 					noise = torch.randn(batch_size, nz, 1, 1, device=self.device)
 					fake = self.G(noise)
 					errD_fake = self.D(fake.detach()).mean()
-					errD_fake.backward()
+					errD_fake.backward(one)
 					pred_fake = self.D(fake.detach()).view(-1)
 					D_G_z1 = pred_fake.mean().item()
 
 					# gradient penalty
-					gradient_penalty = self.calculate_gradient_penalty(real, fake, batch_size)
-					gradient_penalty.backward()
+					gradient_penalty = self.calculate_gradient_penalty(real, fake.detach(), batch_size)
+					gradient_penalty.backward(retain_graph=True)
+					# gradient_penalty = 0
 
 					errD = errD_real + errD_fake + gradient_penalty
 					self.d_optimizer.step()
@@ -203,11 +208,12 @@ class WGAN_GP():
 				##############################
 				# 更新生成器
 				##############################
-				if iters % n_critic == 0:
-					self.G.zero_grad()
-					errG = self.D(fake).mean()
-					errG.backward()
-					self.g_optimizer.step()
+				self.G.zero_grad()
+				noise = torch.randn(batch_size, nz, 1, 1, device=self.device)
+				fake = self.G(noise)
+				errG = self.D(fake).mean()
+				errG.backward(mone)
+				self.g_optimizer.step()
 
 				if i % 50 == 0:
 					print('[%d/%d][%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f'
@@ -218,13 +224,26 @@ class WGAN_GP():
 				D_losses.append(errD.item())
 				iters += 1
 
-			with torch.no_grad():
-				fake = self.G(self.fixed_noise).detach().cpu()
-			img_list = vutils.make_grid(fake, nrow=4, padding=2, normalize=True)
-			plt.imshow(np.transpose(img_list, (1, 2, 0)))
-			plt.title("epoch:" + str(epoch))
-			plt.pause(1)
-			plt.clf()
+			# with torch.no_grad():
+			# 	fake = self.G(self.fixed_noise).detach().cpu()
+			# img_list = vutils.make_grid(fake, nrow=4, padding=2, normalize=True)
+			# plt.imshow(np.transpose(img_list, (1, 2, 0)))
+			# plt.title("epoch:" + str(epoch))
+			# plt.pause(1)
+			# plt.clf()
+
+			# save model and sampling images every 5 epochs
+			if epoch % 5 == 0:
+				self.save_model(epoch)
+				if not os.path.exists('../training/'):
+					os.mkdir('../training/')
+				samples = self.G(fixed_noise)
+				# samples = samples.mul(0.5).add(0.5).detach().cpu()
+				grid = vutils.make_grid(samples, nrow=4)
+				vutils.save_image(grid, '../training/img_generated_epoch_{}.png'.format(epoch))
+
+
+
 		plt.ioff()
 
 

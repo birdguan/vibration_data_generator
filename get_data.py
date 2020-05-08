@@ -13,8 +13,8 @@ def parse_imgs():
     for i in range(len(datas)):
         single_img = datas[i].reshape((3, 256, 256))
         single_img = single_img.transpose((2, 1, 0))
-        img_gray = cv2.cvtColor(single_img, cv2.COLOR_RGB2GRAY)
-        cv2.imwrite("gray_imgs/data_" + str(i) + ".jpg", img_gray)
+        img = cv2.cvtColor(single_img, cv2.COLOR_RGB2BGR)
+        cv2.imwrite("imgs/data/img_" + str(i) + ".png", img)
 
 
 if __name__ == '__main__':

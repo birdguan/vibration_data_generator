@@ -36,3 +36,5 @@ ngpu = 1
 
 #
 n_critic = 5
+
+generator_iters = 5
