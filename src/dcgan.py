@@ -17,32 +17,32 @@ class Generator(nn.Module):
 		super(Generator, self).__init__()
 		self.main_module = nn.Sequential(
 			# 噪声 -> (4, 4, ngf*8)
-			nn.ConvTranspose2d(nz, ngf, 4, 1, 0, bias=False),
-			nn.BatchNorm2d(ngf),
+			nn.ConvTranspose2d(nz, ngf*32, 4, 1, 0, bias=False),
+			nn.BatchNorm2d(ngf*32),
 			nn.ReLU(True),
 
 			# (4, 4, ngf*8) -> (8, 8, ngf*4)
-			nn.ConvTranspose2d(ngf, ngf, 4, 2, 1, bias=False),
-			nn.BatchNorm2d(ngf),
+			nn.ConvTranspose2d(ngf*32, ngf*16, 4, 2, 1, bias=False),
+			nn.BatchNorm2d(ngf*16),
 			nn.ReLU(True),
 
 			# (8, 8, ngf*4) -> (16, 16, ngf*2)
-			nn.ConvTranspose2d(ngf, ngf, 4, 2, 1, bias=False),
-			nn.BatchNorm2d(ngf),
+			nn.ConvTranspose2d(ngf*16, ngf*8, 4, 2, 1, bias=False),
+			nn.BatchNorm2d(ngf*8),
 			nn.ReLU(True),
 
 			# (16, 16, ngf*2) -> (32, 32, ngf*2)
-			nn.ConvTranspose2d(ngf, ngf, 4, 2, 1, bias=False),
-			nn.BatchNorm2d(ngf),
+			nn.ConvTranspose2d(ngf*8, ngf*4, 4, 2, 1, bias=False),
+			nn.BatchNorm2d(ngf*4),
 			nn.ReLU(True),
 
 			# (32, 32, ngf*2) -> (64, 64, ngf)
-			nn.ConvTranspose2d(ngf, ngf, 4, 2, 1, bias=False),
-			nn.BatchNorm2d(ngf),
+			nn.ConvTranspose2d(ngf*4, ngf*2, 4, 2, 1, bias=False),
+			nn.BatchNorm2d(ngf*2),
 			nn.ReLU(True),
 
 			# (64, 64, ngf) -> (128, 128, ngf)
-			nn.ConvTranspose2d(ngf, ngf, 4, 2, 1, bias=False),
+			nn.ConvTranspose2d(ngf*2, ngf, 4, 2, 1, bias=False),
 			nn.BatchNorm2d(ngf),
 			nn.ReLU(True),
 
@@ -64,44 +64,39 @@ class Discriminator(nn.Module):
 			nn.LeakyReLU(0.2, inplace=True),
 
 			# (128, 128, ndf) -> (64, 64, ndf)
-			nn.Conv2d(ndf, ndf, 4, 2, 1, bias=False),
-			nn.InstanceNorm2d(ndf, affine=True),
+			nn.Conv2d(ndf, ndf*2, 4, 2, 1, bias=False),
+			nn.InstanceNorm2d(ndf*2, affine=True),
 			nn.LeakyReLU(0.2, inplace=True),
 
 			# (64, 64, ndf) -> (32, 32, ndf*2)
-			nn.Conv2d(ndf, ndf, 4, 2, 1, bias=False),
-			nn.InstanceNorm2d(ndf, affine=True),
+			nn.Conv2d(ndf*2, ndf*4, 4, 2, 1, bias=False),
+			nn.InstanceNorm2d(ndf*4, affine=True),
 			nn.LeakyReLU(0.2, inplace=True),
 
 			# (32, 32, ndf*2) -> (16, 16, ndf*2)
-			nn.Conv2d(ndf, ndf, 4, 2, 1, bias=False),
-			nn.InstanceNorm2d(ndf, affine=True),
+			nn.Conv2d(ndf*4, ndf*8, 4, 2, 1, bias=False),
+			nn.InstanceNorm2d(ndf*8, affine=True),
 			nn.LeakyReLU(0.2, inplace=True),
 
 			# (16, 16, ndf*2) -> (8, 8, ndf*4)
-			nn.Conv2d(ndf, ndf, 4, 2, 1, bias=False),
-			nn.InstanceNorm2d(ndf, affine=True),
+			nn.Conv2d(ndf*8, ndf*16, 4, 2, 1, bias=False),
+			nn.InstanceNorm2d(ndf*16, affine=True),
 			nn.LeakyReLU(0.2, inplace=True),
 
 			# (8, 8, ndf*4) -> (4, 4, ndf*8)
-			nn.Conv2d(ndf, ndf, 4, 2, 1, bias=False),
-			nn.InstanceNorm2d(ndf, affine=True),
+			nn.Conv2d(ndf*16, ndf*32, 4, 2, 1, bias=False),
+			nn.InstanceNorm2d(ndf*32, affine=True),
 			nn.LeakyReLU(0.2, inplace=True),
-		)
-		self.output = nn.Sequential(
-			nn.Conv2d(ndf, 1, 4, 1, 0, bias=False),
+
+			nn.Conv2d(ndf*32, 1, 4, 1, 0),
+			nn.Sigmoid()
 		)
 
 	def forward(self, x):
-		x = self.main_module(x)
-		return self.output(x)
-
-	def feature_extraction(self, x):
-		x = self.main_module(x)
-		return x.view(-1, ndf*4*4)
+		return self.main_module(x)
 
 
-class WGAN_GP():
+class DCGAN_MODEL():
 	def __init__(self):
 		self.device = torch.device("cuda: 0" if (torch.cuda.is_available() and ngpu > 0) else "cpu")
 		self.G = Generator().to(self.device)
@@ -112,7 +107,7 @@ class WGAN_GP():
 		self.b2 = 0.999
 		self.batch_size = batch_size
 		self.lambda_term = 10
-		self.criterion = nn.BCELoss()
+		self.loss = nn.BCELoss()
 		self.BCE_stable = nn.BCEWithLogitsLoss()
 		self.fixed_noise = torch.rand(16, nz, 1, 1, device=self.device)
 		self.real_label = 1
@@ -141,12 +136,12 @@ class WGAN_GP():
 
 
 	def save_model(self, epoch):
-		torch.save(self.G.state_dict(), "../frozen_model/generator_{}.pkl".format(epoch))
-		torch.save(self.D.state_dict(), "../frozen_model/discriminator_{}.pkl".format(epoch))
+		torch.save(self.G.state_dict(), "../frozen_model/dcgan-generator_{}.pkl".format(epoch))
+		torch.save(self.D.state_dict(), "../frozen_model/dcgan-discriminator_{}.pkl".format(epoch))
 
 	def load_model(self, epoch):
-		self.D.load_state_dict(torch.load("../frozen_model/generator_{}.pkl".format(epoch)))
-		self.G.load_state_dict(torch.load("../frozen_model/discriminator_{}.pkl".format(epoch)))
+		self.D.load_state_dict(torch.load("../frozen_model/dcgan-generator_{}.pkl".format(epoch)))
+		self.G.load_state_dict(torch.load("../frozen_model/dcgan-discriminator_{}.pkl".format(epoch)))
 
 	def train(self):
 		# 创建dataset
@@ -155,13 +150,16 @@ class WGAN_GP():
 										   transforms.Resize(image_size),
 										   transforms.CenterCrop(image_size),
 										   transforms.ToTensor(),
-										   # transforms.Normalize((0.5,), (0.5,)),
+										   transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
 									   ]))
 		# 创建dataloader
 		dataloader = torch.utils.data.DataLoader(dataset,
 												 batch_size=self.batch_size,
 												 shuffle=True,
 												 num_workers=works)
+		real_label=1
+		fake_label=0
+		gan_type = "standard"
 		G_losses = []
 		D_losses = []
 		img_list = []
@@ -178,75 +176,70 @@ class WGAN_GP():
 				##############################
 				# 更新鉴别器
 				##############################
-				for d_iter in range(self.critic_iter):
+				for critic_iter in range(n_critic):
 					# real batch
 					self.D.zero_grad()
 					real = data[0].to(self.device)
-					errD_real = self.D(real).mean()
-					errD_real.backward(mone)
-
 					batch_size = real.size(0)
+					pred_real_label = torch.full((batch_size,), real_label, device=self.device)
 					pred_real = self.D(real).view(-1)
 					D_x = pred_real.mean().item()
 
 					# fake batch
 					noise = torch.randn(batch_size, nz, 1, 1, device=self.device)
 					fake = self.G(noise)
-					errD_fake = self.D(fake.detach()).mean()
-					errD_fake.backward(one)
+					pred_fake_label = torch.full((batch_size,), fake_label, device=self.device)
 					pred_fake = self.D(fake.detach()).view(-1)
 					D_G_z1 = pred_fake.mean().item()
-
-					# gradient penalty
-					gradient_penalty = self.calculate_gradient_penalty(real, fake.detach(), batch_size)
-					gradient_penalty.backward(retain_graph=True)
-					# gradient_penalty = 0
-
-					errD = errD_real + errD_fake + gradient_penalty
+					if gan_type == 'ragan':
+						errD = (self.BCE_stable(pred_real - torch.mean(pred_fake), pred_real_label)
+								+ self.BCE_stable(pred_fake - torch.mean(pred_real), pred_fake_label)) / 2
+						errD.backward()
+					elif gan_type == 'standard':
+						errD_real = self.loss(nn.Sigmoid()(pred_real), pred_real_label)
+						errD_fake = self.loss(nn.Sigmoid()(pred_fake), pred_fake_label)
+						errD = errD_real + errD_fake
+						errD.backward()
 					self.d_optimizer.step()
 
 				##############################
 				# 更新生成器
 				##############################
 				self.G.zero_grad()
-				noise = torch.randn(batch_size, nz, 1, 1, device=self.device)
-				fake = self.G(noise)
-				errG = self.D(fake).mean()
-				errG.backward(mone)
+				pred_fake = self.D(fake).view(-1)
+				if gan_type == 'ragan':
+					errG = (self.BCE_stable(pred_real.detach() - torch.mean(pred_fake), pred_fake_label) +
+							self.BCE_stable(pred_fake - torch.mean(pred_real.detach()), pred_real_label)) / 2
+					errG.backward()
+				elif gan_type == 'standard':
+					errG = self.loss(nn.Sigmoid()(pred_fake), pred_real_label)
+					errG.backward()
+				D_G_z2 = pred_fake.mean().item()
 				self.g_optimizer.step()
 
 				if i % 50 == 0:
-					print('[%d/%d][%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f'
+					print('[%d/%d][%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f'
 						  % (epoch, num_epochs, i, len(dataloader),
-							 errD.item(), errG.item(), D_x, D_G_z1))
+							 errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
 
 				G_losses.append(errG.item())
 				D_losses.append(errD.item())
 				iters += 1
 
-			# with torch.no_grad():
-			# 	fake = self.G(self.fixed_noise).detach().cpu()
-			# img_list = vutils.make_grid(fake, nrow=4, padding=2, normalize=True)
-			# plt.imshow(np.transpose(img_list, (1, 2, 0)))
-			# plt.title("epoch:" + str(epoch))
-			# plt.pause(1)
-			# plt.clf()
-
-			# save model and sampling images every 5 epochs
-			if epoch % 5 == 0:
-				self.save_model(epoch)
-				if not os.path.exists('../training/'):
-					os.mkdir('../training/')
-				samples = self.G(fixed_noise)
-				# samples = samples.mul(0.5).add(0.5).detach().cpu()
-				grid = vutils.make_grid(samples, nrow=4)
-				vutils.save_image(grid, '../training/img_generated_epoch_{}.png'.format(epoch))
-
-
+				# save model and sampling images every 5 epochs
+				if epoch % 5 == 0:
+					self.save_model(epoch)
+					if not os.path.exists('../training/'):
+						os.mkdir('../training/')
+					samples = self.G(fixed_noise)
+					# samples = samples.mul(0.5).add(0.5).detach().cpu()
+					# grid = vutils.make_grid(samples, nrow=4)
+					vutils.save_image(samples, filename='../training/img_generated_epoch_{}.png'.format(epoch),
+									  nrow=4)
 
 		plt.ioff()
 
 
 if __name__ == '__main__':
-	model = WGAN_GP()
+	model = DCGAN_MODEL()
 	model.train()
