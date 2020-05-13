@@ -145,8 +145,8 @@ class WGAN_GP():
 		torch.save(self.D.state_dict(), "../frozen_model/wgan-gp-discriminator_{}.pkl".format(epoch))
 
 	def load_model(self, epoch):
-		self.D.load_state_dict(torch.load("../frozen_model/wgan-gp-generator_{}.pkl".format(epoch)))
-		self.G.load_state_dict(torch.load("../frozen_model/wgan-gp-discriminator_{}.pkl".format(epoch)))
+		self.G.load_state_dict(torch.load("../frozen_model/wgan-gp-generator_{}.pkl".format(epoch)))
+		self.D.load_state_dict(torch.load("../frozen_model/wgan-gp-discriminator_{}.pkl".format(epoch)))
 
 	def train(self):
 		# 创建dataset
@@ -247,7 +247,20 @@ class WGAN_GP():
 
 		plt.ioff()
 
+	def evaluate(self, num, model_epoch = 110):
+		self.load_model(model_epoch)
+		for i in range(num):
+			z = torch.rand(1, nz, 1, 1, device=self.device)
+			sample = self.G(z)
+			vutils.save_image(sample, filename="../result/res_{}.png".format(i), nrow=1)
+
+
 
 if __name__ == '__main__':
+
 	model = WGAN_GP()
-	model.train()
+	istrain = False
+	if istrain:
+		model.train()
+	else:
+		model.evaluate(num=100, model_epoch=495)

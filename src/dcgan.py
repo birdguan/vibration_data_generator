@@ -140,8 +140,8 @@ class DCGAN_MODEL():
 		torch.save(self.D.state_dict(), "../frozen_model/dcgan-discriminator_{}.pkl".format(epoch))
 
 	def load_model(self, epoch):
-		self.D.load_state_dict(torch.load("../frozen_model/dcgan-generator_{}.pkl".format(epoch)))
-		self.G.load_state_dict(torch.load("../frozen_model/dcgan-discriminator_{}.pkl".format(epoch)))
+		self.G.load_state_dict(torch.load("../frozen_model/dcgan-generator_{}.pkl".format(epoch)))
+		self.D.load_state_dict(torch.load("../frozen_model/dcgan-discriminator_{}.pkl".format(epoch)))
 
 	def train(self):
 		# 创建dataset
@@ -196,8 +196,8 @@ class DCGAN_MODEL():
 								+ self.BCE_stable(pred_fake - torch.mean(pred_real), pred_fake_label)) / 2
 						errD.backward()
 					elif gan_type == 'standard':
-						errD_real = self.loss(nn.Sigmoid()(pred_real), pred_real_label)
-						errD_fake = self.loss(nn.Sigmoid()(pred_fake), pred_fake_label)
+						errD_real = self.loss((pred_real), pred_real_label)
+						errD_fake = self.loss((pred_fake), pred_fake_label)
 						errD = errD_real + errD_fake
 						errD.backward()
 					self.d_optimizer.step()
@@ -212,7 +212,7 @@ class DCGAN_MODEL():
 							self.BCE_stable(pred_fake - torch.mean(pred_real.detach()), pred_real_label)) / 2
 					errG.backward()
 				elif gan_type == 'standard':
-					errG = self.loss(nn.Sigmoid()(pred_fake), pred_real_label)
+					errG = self.loss((pred_fake), pred_real_label)
 					errG.backward()
 				D_G_z2 = pred_fake.mean().item()
 				self.g_optimizer.step()
@@ -226,20 +226,31 @@ class DCGAN_MODEL():
 				D_losses.append(errD.item())
 				iters += 1
 
-				# save model and sampling images every 5 epochs
-				if epoch % 5 == 0:
-					self.save_model(epoch)
-					if not os.path.exists('../training/'):
-						os.mkdir('../training/')
-					samples = self.G(fixed_noise)
-					# samples = samples.mul(0.5).add(0.5).detach().cpu()
-					# grid = vutils.make_grid(samples, nrow=4)
-					vutils.save_image(samples, filename='../training/img_generated_epoch_{}.png'.format(epoch),
-									  nrow=4)
+			# save model and sampling images every 5 epochs
+			if epoch % 5 == 0:
+				self.save_model(epoch)
+				if not os.path.exists('../training_dcgan/'):
+					os.mkdir('../training_dcgan/')
+				samples = self.G(fixed_noise)
+				# samples = samples.mul(0.5).add(0.5).detach().cpu()
+				# grid = vutils.make_grid(samples, nrow=4)
+				vutils.save_image(samples, filename='../training_dcgan/img_generated_epoch_{}.png'.format(epoch),
+								  nrow=4)
 
 		plt.ioff()
+
+	def evaluate(self, num, model_epoch = 110):
+		self.load_model(model_epoch)
+		for i in range(num):
+			z = torch.rand(1, nz, 1, 1, device=self.device)
+			sample = self.G(z)
+			vutils.save_image(sample, filename="../result/res_{}.png".format(i), nrow=1)
 
 
 if __name__ == '__main__':
 	model = DCGAN_MODEL()
-	model.train()
+	istrain = False
+	if istrain:
+		model.train()
+	else:
+		model.evaluate(num=100, model_epoch=110)
