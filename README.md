@@ -34,5 +34,5 @@ python src/wgan-gp.py
 ![](training_dcgan/img_generated_epoch_110.png)
 
 ## 结论
-实验证明，DCGAN效果是要好于WGAN-GP的。  
+实验证明，DCGAN效果是要好于WGAN-GP的。   
 另256×256的数据确实比较大，DCGAN也显得捉襟见肘，可使用PGGAN。
